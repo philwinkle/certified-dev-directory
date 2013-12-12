@@ -1,0 +1,14 @@
+{
+    "name": "philwinkle/dev-directory",
+    "description": "Crawls the Magento Certified Developer Directory and builds a queryable db table",
+    "license": "OSL 3.0",
+    "authors": [
+        {
+            "name": "Phillip Jackson",
+            "email": "philwinkle@gmail.com"
+        }
+    ],
+    "require": {
+        "fabpot/goutte": "1.0.*@dev"
+    }
+}
