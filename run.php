@@ -2,28 +2,49 @@
 // ini_set('xdebug.var_display_max_depth', '-1');
 // ini_set('xdebug.var_display_max_children', '-1');
 
+const DS = DIRECTORY_SEPARATOR;
+
 require 'vendor/autoload.php';
 require 'goutte.phar';
 
 use Goutte\Client;
+use Keboola\Csv\CsvFile;
 
-class Crawl {
+class Crawl
+{
     
     protected $_client;
+    public    $doCsvOutput;
+    public    $outputUpperBound;
+
     const MAGENTO_DEV_DIR_URL = 'http://www.magentocommerce.com/certification/directory/?q=&in=&country_id=US&region_id=&region=&certificate_type=&p=';
     const OUTPUT_FILENAME     = 'output.csv';
 
-    public function __construct()
+    /**
+     * Constructor to set up class properties and execute init()
+     * @param boolean $doCsvOutput
+     */
+    public function __construct($outputUpperBound = null, $doCsvOutput = true)
     {
+        //set output page upper bound
+        $this->outputUpperBound = $outputUpperBound;
+
+        //set csv output flag
+        $this->doCsvOutput = $doCsvOutput;
+        
         $this->_client  = new Client();
         $this->dom      = new DOMDocument();
-        $this->run();       
+        $this->init();  
     }
 
-    public function run()
+    /**
+     * Init the crawler and conditionally output csv
+     * @return void
+     */
+    public function init()
     {
+        //init the results array and create the first record as headers
         $results = array();
-        $preg    = array();
 
         $initCrawler = $this->_client->request('GET', self::MAGENTO_DEV_DIR_URL);
         $numPages = $initCrawler->filter('a.last')->text();
@@ -50,14 +71,19 @@ class Crawl {
                 echo "Processed record $j of page $i" . PHP_EOL;
             }
 
+            if($this->outputUpperBound>1 && $i>=$this->outputUpperBound) break;
+
         }
 
-        $output = array();
-        foreach($results as $line){
-            $output[] = join(',', $line);
-        }
+        //if we should be doing csv output, prepend headers
+        if($this->doCsvOutput){
+            array_unshift($results, array('name','company','location','certification','date'));
+            $csvFile = new CsvFile( __DIR__ . DS . self::OUTPUT_FILENAME );
 
-        file_put_contents(self::OUTPUT_FILENAME, join("\n",$output));
+            foreach($results as $result){
+                $csvFile->writeRow($result);
+            }
+        }
     }
 }
 
