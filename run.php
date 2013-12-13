@@ -1,6 +1,4 @@
 <?php
-// ini_set('xdebug.var_display_max_depth', '-1');
-// ini_set('xdebug.var_display_max_children', '-1');
 
 const DS = DIRECTORY_SEPARATOR;
 
@@ -16,25 +14,29 @@ class Crawl
     protected $_client;
     public    $doCsvOutput;
     public    $outputUpperBound;
+    public    $countryId;
 
-    const MAGENTO_DEV_DIR_URL = 'http://www.magentocommerce.com/certification/directory/?q=&in=&country_id=US&region_id=&region=&certificate_type=&p=';
-    const OUTPUT_FILENAME     = 'output.csv';
+    const MAGENTO_DEV_DIR_URL = 'http://www.magentocommerce.com/certification/directory/?q=&in=&country_id=%s&region_id=&region=&certificate_type=&p=';
+    const OUTPUT_FILENAME     = 'output_%s.csv';
 
     /**
      * Constructor to set up class properties and execute init()
      * @param boolean $doCsvOutput
      */
-    public function __construct($outputUpperBound = null, $doCsvOutput = true)
+    public function __construct($outputUpperBound = null, $countryId = 'US', $doCsvOutput = true)
     {
         //set output page upper bound
         $this->outputUpperBound = $outputUpperBound;
+
+        //set country id
+        $this->countryId = $countryId;
 
         //set csv output flag
         $this->doCsvOutput = $doCsvOutput;
         
         $this->_client  = new Client();
         $this->dom      = new DOMDocument();
-        $this->init();  
+        $this->init();
     }
 
     /**
@@ -43,19 +45,17 @@ class Crawl
      */
     public function init()
     {
-        //init the results array and create the first record as headers
-        $results = array();
+        $results = array(); //init the results array
 
-        $initCrawler = $this->_client->request('GET', self::MAGENTO_DEV_DIR_URL);
+        $initCrawler = $this->_client->request( 'GET', $this->getDirectoryUrl() );
         $numPages = $initCrawler->filter('a.last')->text();
 
         $limit = (int)$numPages;
 
         for($i=1;$i<=$limit;$i++){
             
-            $crawler = $this->_client->request('GET', self::MAGENTO_DEV_DIR_URL . $i);
+            $crawler = $this->_client->request('GET', $this->getDirectoryUrl() . $i);
             $numDevelopers = $crawler->filter('.results tr')->count();
-            // var_dump($numDevelopers);
 
             for($j=1;$j<$numDevelopers;$j++){
                 $developer = $crawler->filter('.results tr')->eq($j);
@@ -72,19 +72,27 @@ class Crawl
             }
 
             if($this->outputUpperBound>1 && $i>=$this->outputUpperBound) break;
-
         }
 
-        //if we should be doing csv output, prepend headers
         if($this->doCsvOutput){
-            array_unshift($results, array('name','company','location','certification','date'));
-            $csvFile = new CsvFile( __DIR__ . DS . self::OUTPUT_FILENAME );
+            array_unshift($results, array('name','company','location','certification','date')); //prepend headers
+            $csvFile = new CsvFile( __DIR__ . DS . $this->getOutputFilename() );
 
             foreach($results as $result){
                 $csvFile->writeRow($result);
             }
         }
     }
+
+    public function getDirectoryUrl()
+    {
+        return sprintf(self::MAGENTO_DEV_DIR_URL, $this->countryId);
+    }
+
+    public function getOutputFilename()
+    {
+        return sprintf(self::OUTPUT_FILENAME, $this->countryId);
+    }
 }
 
-new Crawl();
+new Crawl(null, 'GB');
